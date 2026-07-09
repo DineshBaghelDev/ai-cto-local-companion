@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI CTO - Companion</title>
+<style>
+  :root {
+    --bg:#11131a; --panel:#1a1e28; --panel2:#222736; --text:#e8eaf0;
+    --dim:#8b91a5; --accent:#5ac8fa; --ok:#4cd964; --warn:#ffcc00; --err:#ff5f57;
+    --border:#2e3446;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--text);
+    font:15px/1.5 "Segoe UI", system-ui, sans-serif;
+    display:grid; grid-template-columns:1fr 380px; grid-template-rows:auto auto 1fr auto;
+    height:100vh;
+  }
+  header, footer {
+    background:var(--panel); border-color:var(--border); display:flex; align-items:center; gap:12px;
+  }
+  header { grid-column:1 / 3; padding:10px 18px; border-bottom:1px solid var(--border); }
+  footer { grid-column:1; padding:12px 18px; border-top:1px solid var(--border); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0; font-weight:600; }
+  #status { font-size:13px; color:var(--dim); }
+  #status.connected { color:var(--ok); }
+  #status.error { color:var(--err); }
+  .spacer { flex:1; }
+  #health {
+    grid-column:1 / 3; display:grid; grid-template-columns:repeat(4, minmax(0, 1fr));
+    gap:1px; background:var(--border); border-bottom:1px solid var(--border);
+  }
+  .tile { background:#151923; padding:10px 14px; min-width:0; }
+  .tile .label { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+  .tile .value { margin-top:2px; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--dim); margin-right:7px; }
+  .dot.ok { background:var(--ok); }
+  .dot.err { background:var(--err); }
+  .dot.warn { background:var(--warn); }
+  button, input {
+    background:var(--panel2); color:var(--text); border:1px solid var(--border);
+    border-radius:8px; padding:7px 12px; font-size:14px;
+  }
+  select {
+    width:100%; background:var(--panel2); color:var(--text); border:1px solid var(--border);
+    border-radius:8px; padding:7px 9px; font-size:13px;
+  }
+  select:disabled { opacity:.45; }
+  button { cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button.primary { background:var(--accent); color:#0b0d12; border-color:var(--accent); font-weight:600; }
+  button:disabled, input:disabled { opacity:.45; cursor:default; }
+  #transcript { grid-column:1; overflow-y:auto; padding:18px; display:flex; flex-direction:column; gap:10px; }
+  .msg { max-width:78%; padding:9px 13px; border-radius:12px; white-space:pre-wrap; }
+  .msg.user { align-self:flex-end; background:#2b3a55; }
+  .msg.bot { align-self:flex-start; background:var(--panel2); }
+  .msg.system { align-self:center; background:transparent; color:var(--dim); font-size:13px; }
+  .msg .who { font-size:11px; color:var(--dim); margin-bottom:2px; }
+  aside {
+    grid-column:2; grid-row:3 / 5; border-left:1px solid var(--border);
+    background:var(--panel); padding:14px; overflow-y:auto;
+  }
+  aside h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); margin:0 0 10px; }
+  .mem { background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin-bottom:8px; font-size:13px; }
+  .mem .tool { color:var(--accent); font-family:Consolas, monospace; font-size:12px; }
+  .mem .detail { color:var(--dim); word-break:break-word; }
+  .blocker { border-left:3px solid var(--warn); }
+  .blocker.resolved, .blocker.resumed { border-left-color:var(--ok); opacity:.75; }
+  .blocker .state { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--warn); }
+  .blocker.resolved .state, .blocker.resumed .state { color:var(--ok); }
+  #ptt { width:130px; user-select:none; }
+  #ptt.talking { background:var(--ok); color:#0b0d12; border-color:var(--ok); font-weight:600; }
+  label.mode { font-size:13px; color:var(--dim); display:flex; align-items:center; gap:6px; }
+  #micState { font-size:12px; color:var(--dim); min-width:90px; }
+  #saveNote { margin-left:auto; }
+  #chatInput { flex:1 1 360px; min-width:220px; }
+  .hint { font-size:12px; color:var(--dim); }
+  .field { display:grid; gap:5px; margin-bottom:8px; }
+  .field label { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+  #applyAudio { width:100%; }
+  #activity .detail, #tasks .detail { color:var(--text); }
+  @media (max-width: 900px) {
+    body { grid-template-columns:1fr; grid-template-rows:auto auto minmax(280px, 1fr) auto auto; }
+    header, #health { grid-column:1; }
+    #health { grid-template-columns:1fr 1fr; }
+    aside { grid-column:1; grid-row:auto; max-height:42vh; border-left:0; border-top:1px solid var(--border); }
+    footer { grid-column:1; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>AI CTO - Companion</h1>
+  <span id="status">text ready, desktop voice runs outside browser</span>
+  <span class="spacer"></span>
+  <button id="connect" class="primary">Browser voice fallback</button>
+</header>
+
+<section id="health">
+  <div class="tile"><div class="label">App</div><div class="value"><span id="appDot" class="dot"></span><span id="appState">checking...</span></div></div>
+  <div class="tile"><div class="label">Desktop Voice</div><div class="value"><span id="voiceDot" class="dot"></span><span id="voiceState">checking...</span></div></div>
+  <div class="tile"><div class="label">Input</div><div class="value" id="inputDevice">-</div></div>
+  <div class="tile"><div class="label">Output</div><div class="value" id="outputDevice">-</div></div>
+</section>
+
+<div id="transcript"></div>
+
+<aside>
+  <h2>Now</h2>
+  <div id="now"><div class="hint">Checking runtime...</div></div>
+  <h2 style="margin-top:16px">Audio</h2>
+  <div class="mem">
+    <div class="field"><label for="inputSelect">Input</label><select id="inputSelect"></select></div>
+    <div class="field"><label for="outputSelect">Output</label><select id="outputSelect"></select></div>
+    <button id="applyAudio" class="primary">Restart desktop voice</button>
+    <div id="audioMsg" class="hint" style="margin-top:8px"></div>
+  </div>
+  <h2 style="margin-top:16px">Tasks</h2>
+  <div id="tasks"><div class="hint">No active tasks.</div></div>
+  <h2 style="margin-top:16px">Activity</h2>
+  <div id="activity"><div class="hint">No activity yet.</div></div>
+  <h2>Blockers</h2>
+  <div id="blockers"><div class="hint">No blockers.</div></div>
+  <h2 style="margin-top:16px">Memory used</h2>
+  <div id="memlog"><div class="hint">Memory/tool calls appear here.</div></div>
+</aside>
+
+<footer>
+  <input id="chatInput" placeholder="Type to fast text brain...">
+  <button id="sendText" class="primary">Send</button>
+  <label class="mode"><input type="checkbox" id="convMode"> conversation mode</label>
+  <button id="ptt" disabled>Hold to talk</button>
+  <span id="micState">mic muted</span>
+  <button id="saveNote" disabled>Save last exchange</button>
+</footer>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+let pc = null, micTrack = null, ws = null, wsRetry = 0, wsPing = null;
+let lastUser = "", lastBot = "", botLive = null, userLive = null;
+let audioLoaded = false;
+
+function setStatus(text, cls) { const s = $("status"); s.textContent = text; s.className = cls || ""; }
+function esc(s) {
+  return String(s || "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+}
+
+function addMsg(who, text) {
+  const d = document.createElement("div");
+  d.className = "msg " + who;
+  if (who === "system") d.textContent = text;
+  else {
+    d.innerHTML = `<div class="who">${who === "user" ? "you" : "cto"}</div><div class="body"></div>`;
+    d.querySelector(".body").textContent = text;
+  }
+  $("transcript").appendChild(d);
+  $("transcript").scrollTop = $("transcript").scrollHeight;
+  return d;
+}
+
+function addMem(evt) {
+  const log = $("memlog");
+  if (log.firstChild && log.firstChild.className === "hint") log.innerHTML = "";
+  const d = document.createElement("div");
+  d.className = "mem";
+  d.innerHTML = `<div class="tool"></div><div class="detail"></div>`;
+  d.querySelector(".tool").textContent = evt.tool;
+  d.querySelector(".detail").textContent = evt.detail || "";
+  log.prepend(d);
+}
+
+function setUserLive(text) {
+  if (!userLive) userLive = addMsg("user", text);
+  userLive.querySelector(".body").textContent = text;
+  $("transcript").scrollTop = $("transcript").scrollHeight;
+}
+
+function setMic(on) {
+  if (micTrack) micTrack.enabled = on;
+  $("micState").textContent = on ? "mic LIVE" : "mic muted";
+}
+
+function cleanupVoice() {
+  if (micTrack) { micTrack.stop(); micTrack = null; }
+  if (pc) { pc.onconnectionstatechange = null; pc.close(); pc = null; }
+  setMic(false);
+  $("ptt").disabled = true;
+  $("connect").disabled = false;
+  $("connect").textContent = "Reconnect fallback";
+}
+
+function openEvents() {
+  if (ws && [WebSocket.OPEN, WebSocket.CONNECTING].includes(ws.readyState)) return;
+  const scheme = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${scheme}://${location.host}/ws/events`);
+  ws.onopen = () => {
+    wsRetry = 0;
+    clearInterval(wsPing);
+    wsPing = setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send("ping"); }, 20000);
+  };
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.type === "user_speech_start") {
+      setUserLive("Listening...");
+    } else if (m.type === "user_transcript_partial") {
+      setUserLive(m.text);
+    } else if (m.type === "user_speech_stop") {
+      if (userLive && userLive.querySelector(".body").textContent === "Listening...") {
+        userLive.querySelector(".body").textContent = "Transcribing...";
+      }
+    } else if (m.type === "user_transcript") {
+      lastUser = m.text;
+      if (userLive) {
+        userLive.querySelector(".body").textContent = m.text;
+        userLive = null;
+      } else addMsg("user", m.text);
+      refreshRuntime();
+    } else if (m.type === "bot_text_start") {
+      botLive = addMsg("bot", ""); lastBot = "";
+    } else if (m.type === "bot_text") {
+      lastBot += m.text;
+      if (!botLive) botLive = addMsg("bot", "");
+      botLive.querySelector(".body").textContent = lastBot;
+      $("transcript").scrollTop = $("transcript").scrollHeight;
+    } else if (m.type === "bot_text_end") {
+      botLive = null; $("saveNote").disabled = !(lastUser || lastBot);
+      refreshRuntime();
+    } else if (m.type === "memory") {
+      addMem(m);
+    } else if (m.type === "error") {
+      setStatus(m.text, "error");
+    }
+  };
+  ws.onclose = () => {
+    clearInterval(wsPing);
+    const delay = Math.min(15000, 1000 * Math.pow(2, wsRetry++));
+    setTimeout(openEvents, delay);
+  };
+}
+
+async function connect() {
+  cleanupVoice();
+  $("connect").disabled = true;
+  setStatus("requesting mic...");
+  try {
+    const media = await navigator.mediaDevices.getUserMedia({ audio: {
+      echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    micTrack = media.getAudioTracks()[0];
+    setMic($("convMode").checked);
+
+    pc = new RTCPeerConnection();
+    pc.addTransceiver(micTrack, { direction: "sendrecv" });
+    pc.ontrack = ev => {
+      const audio = new Audio();
+      audio.srcObject = ev.streams[0];
+      audio.autoplay = true;
+    };
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "connected") {
+        setStatus("voice connected", "connected");
+        $("ptt").disabled = false;
+        $("connect").disabled = true;
+      } else if (["failed", "disconnected", "closed"].includes(pc.connectionState)) {
+        setStatus("voice disconnected; text mode still works", "error");
+        cleanupVoice();
+      }
+    };
+    pc.oniceconnectionstatechange = () => {
+      if (["failed", "disconnected", "closed"].includes(pc.iceConnectionState)) {
+        setStatus("browser fallback ICE failed; desktop voice/text still usable", "error");
+        cleanupVoice();
+      }
+    };
+
+    setStatus("negotiating voice...");
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await new Promise(res => {
+      if (pc.iceGatheringState === "complete") return res();
+      pc.onicegatheringstatechange = () => pc.iceGatheringState === "complete" && res();
+      setTimeout(res, 2000);
+    });
+    const resp = await fetch("/api/offer", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sdp: pc.localDescription.sdp, type: pc.localDescription.type }),
+    });
+    if (!resp.ok) throw new Error(`offer failed: HTTP ${resp.status}`);
+    await pc.setRemoteDescription(await resp.json());
+  } catch (err) {
+    setStatus(`voice failed: ${err}. Text mode works.`, "error");
+    cleanupVoice();
+  }
+}
+
+async function sendText() {
+  const msg = $("chatInput").value.trim();
+  if (!msg) return;
+  $("chatInput").value = "";
+  $("sendText").disabled = true;
+  lastUser = msg; addMsg("user", msg);
+  const live = addMsg("bot", "Thinking...");
+  try {
+    const r = await fetch("/api/chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: msg }),
+    });
+    const j = await r.json();
+    lastBot = j.ok ? j.reply : `FAILED: ${j.error}`;
+    live.querySelector(".body").textContent = lastBot;
+    $("saveNote").disabled = false;
+    addMem({ tool: j.source || "text", detail: j.ok ? "text response" : j.error });
+  } catch (e) {
+    lastBot = `FAILED: ${e}`;
+    live.querySelector(".body").textContent = lastBot;
+  } finally {
+    $("sendText").disabled = false;
+    $("chatInput").focus();
+  }
+}
+
+const ptt = $("ptt");
+function pttDown() { if (!$("convMode").checked) { ptt.classList.add("talking"); setMic(true); } }
+function pttUp() { if (!$("convMode").checked) { ptt.classList.remove("talking"); setMic(false); } }
+ptt.addEventListener("mousedown", pttDown);
+ptt.addEventListener("mouseup", pttUp);
+ptt.addEventListener("mouseleave", pttUp);
+ptt.addEventListener("touchstart", e => { e.preventDefault(); pttDown(); });
+ptt.addEventListener("touchend", e => { e.preventDefault(); pttUp(); });
+window.addEventListener("keydown", e => { if (e.code === "Space" && e.target === document.body) { e.preventDefault(); pttDown(); } });
+window.addEventListener("keyup", e => { if (e.code === "Space" && e.target === document.body) { e.preventDefault(); pttUp(); } });
+$("convMode").addEventListener("change", () => setMic($("convMode").checked));
+
+$("saveNote").addEventListener("click", async () => {
+  $("saveNote").disabled = true;
+  const r = await fetch("/api/save_memory", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user: lastUser, assistant: lastBot }),
+  });
+  const j = await r.json();
+  addMem({ tool: "write_note", detail: j.ok ? `saved: ${j.title}` : `FAILED: ${j.error}` });
+  $("saveNote").disabled = false;
+});
+
+async function refreshBlockers() {
+  try {
+    const rows = await (await fetch("/api/blockers")).json();
+    const box = $("blockers");
+    if (!rows.length) { box.innerHTML = '<div class="hint">No blockers.</div>'; return; }
+    box.innerHTML = "";
+    for (const b of rows.slice(0, 8)) {
+      const d = document.createElement("div");
+      d.className = "mem blocker " + b.status;
+      d.innerHTML = `<div class="state"></div><div class="tool"></div><div class="detail"></div>`;
+      d.querySelector(".state").textContent = b.status;
+      d.querySelector(".tool").textContent = b.task_id;
+      d.querySelector(".detail").textContent =
+        b.task_text + (b.decision ? " - decision: " + b.decision : "");
+      box.appendChild(d);
+    }
+  } catch (e) {}
+}
+
+function renderRuntime(rt, snap) {
+  $("appDot").className = "dot " + (rt.ok && rt.server.ready ? "ok" : "warn");
+  $("appState").textContent = rt.ok && rt.server.ready ? `running ${rt.uptime_seconds}s` : "starting";
+  const voiceOk = !!(rt.desktop_voice && rt.desktop_voice.ready && !rt.desktop_voice.last_error);
+  $("voiceDot").className = "dot " + (voiceOk ? "ok" : (rt.desktop_voice.ready ? "warn" : "err"));
+  $("voiceState").textContent = voiceOk ? "ready" : (rt.desktop_voice.last_error ? "needs attention" : "starting");
+  $("inputDevice").textContent = rt.desktop_voice.input || "-";
+  $("outputDevice").textContent = rt.desktop_voice.output || "-";
+  const lastHeard = rt.desktop_voice.last_user ? rt.desktop_voice.last_user.split("you:").pop().trim() : "-";
+  const lastReply = rt.desktop_voice.last_cto ? rt.desktop_voice.last_cto.split("cto:").pop().trim() : "-";
+  $("now").innerHTML = `
+    <div class="mem"><div class="tool">state</div><div class="detail">${voiceOk ? "Desktop voice is listening." : esc(rt.desktop_voice.last_error || "Starting up")}</div></div>
+    <div class="mem"><div class="tool">last heard</div><div class="detail">${esc(lastHeard)}</div></div>
+    <div class="mem"><div class="tool">last reply</div><div class="detail">${esc(lastReply)}</div></div>
+    <div class="mem"><div class="tool">repo</div><div class="detail">${esc(rt.default_repo || "No default repo set")}</div></div>`;
+  const active = (snap.active || []);
+  $("tasks").innerHTML = active.length ? active.map(t =>
+    `<div class="mem"><div class="tool">${esc(t.status)} ${esc(t.task_id)}</div><div class="detail">${esc(t.text)}</div></div>`
+  ).join("") : '<div class="hint">No active tasks.</div>';
+  const acts = (snap.activity || []).slice(0, 6);
+  $("activity").innerHTML = acts.length ? acts.map(a =>
+    `<div class="mem"><div class="tool">${esc(a.kind)} ${esc(a.ts)}</div><div class="detail">${esc(a.message)}</div></div>`
+  ).join("") : '<div class="hint">No activity yet.</div>';
+}
+
+async function loadAudioDevices() {
+  try {
+    const j = await (await fetch("/api/audio/devices")).json();
+    const input = $("inputSelect"), output = $("outputSelect");
+    input.innerHTML = "";
+    output.innerHTML = "";
+    for (const d of j.devices) {
+      if (d.inputs > 0) {
+        const opt = document.createElement("option");
+        opt.value = d.id;
+        opt.textContent = `${d.id}: ${d.name}`;
+        if (/camo/i.test(d.name)) opt.disabled = true;
+        if (d.id === j.prefs.input_device) opt.selected = true;
+        input.appendChild(opt);
+      }
+      if (d.outputs > 0) {
+        const opt = document.createElement("option");
+        opt.value = d.id;
+        opt.textContent = `${d.id}: ${d.name}`;
+        if (d.id === j.prefs.output_device) opt.selected = true;
+        output.appendChild(opt);
+      }
+    }
+    audioLoaded = true;
+  } catch (e) {
+    $("audioMsg").textContent = `Device list failed: ${e}`;
+  }
+}
+
+async function applyAudioDevices() {
+  $("applyAudio").disabled = true;
+  $("audioMsg").textContent = "Restarting desktop voice...";
+  try {
+    const r = await fetch("/api/audio/restart", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        input_device: Number($("inputSelect").value),
+        output_device: Number($("outputSelect").value),
+      }),
+    });
+    const j = await r.json();
+    $("audioMsg").textContent = j.ok ? "Restarted. It may take a few seconds to become ready." : `Failed: ${j.error}`;
+    setTimeout(refreshRuntime, 3000);
+  } catch (e) {
+    $("audioMsg").textContent = `Failed: ${e}`;
+  } finally {
+    $("applyAudio").disabled = false;
+  }
+}
+
+async function refreshRuntime() {
+  try {
+    const [rt, snap] = await Promise.all([
+      fetch("/api/runtime").then(r => r.json()),
+      fetch("/api/status").then(r => r.json()),
+    ]);
+    renderRuntime(rt, snap);
+  } catch (e) {
+    $("appDot").className = "dot err";
+    $("appState").textContent = "offline";
+    $("now").innerHTML = `<div class="mem"><div class="tool">error</div><div class="detail">${esc(e)}</div></div>`;
+  }
+}
+
+$("connect").addEventListener("click", connect);
+$("sendText").addEventListener("click", sendText);
+$("chatInput").addEventListener("keydown", e => { if (e.key === "Enter") sendText(); });
+$("applyAudio").addEventListener("click", applyAudioDevices);
+setInterval(refreshBlockers, 5000);
+setInterval(refreshRuntime, 3000);
+refreshBlockers();
+refreshRuntime();
+loadAudioDevices();
+openEvents();
+</script>
+</body>
+</html>

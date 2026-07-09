@@ -1,0 +1,21 @@
+# Load-bearing dependency pins for the voice venv (Jarvis V2, 2026-07-09).
+# Use with:  pip install -c constraints.txt <whatever>
+#
+# These three are NOT optional — they resolve a conflict that otherwise silently
+# breaks Kokoro TTS (the default voice engine):
+#
+#   * kokoro-onnx needs `phonemizer-fork` (provides EspeakWrapper.set_data_path).
+#     Installing NeuTTS pulls the real `phonemizer` package, which shares the same
+#     `phonemizer/` import namespace and clobbers the fork. Keep the fork.
+#   * phonemizer-fork uses pkg_resources, which setuptools >= 81 removed; torch
+#     needs setuptools >= 77. 80.9.0 satisfies both.
+#
+# If you reinstall/upgrade anything in this venv, pass -c constraints.txt.
+
+phonemizer-fork>=3.3.2
+setuptools==80.9.0
+
+# Optional NeuTTS realtime path (GGUF backbone) needs llama-cpp-python, but no
+# working Python 3.13 Windows binary exists yet (source build hits a long-path
+# error; the prebuilt CPU wheel crashes with 0xc000001d on some CPUs). NeuTTS
+# therefore runs on its torch backend (not realtime) and is opt-in only.
