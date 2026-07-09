@@ -145,6 +145,38 @@ latency logging in `logs/desktop-voice.log`).
 
 Never store tokens in chat, Markdown, logs, or repo files.
 
+## Optional V2 Tools
+
+Jarvis exposes optional LangGraph, browser, Gmail, and Calendar tools. They are
+off by default and fail closed with a setup message when dependencies or OAuth
+files are missing.
+
+Browser automation:
+
+```powershell
+pip install playwright
+python -m playwright install chromium
+```
+
+Gmail and Calendar:
+
+```powershell
+pip install google-api-python-client google-auth-oauthlib
+```
+
+Create a Google OAuth desktop client, save its client-secret JSON outside git
+at `.run/google-client-secret.json`, then use `google_auth_status` or any
+Gmail/Calendar tool to complete local OAuth. Tokens are written under
+`AI_CTO_STATE` or `AI_CTO_GOOGLE_TOKEN` and are ignored by git.
+
+LangGraph:
+
+```powershell
+pip install langgraph
+```
+
+Email sending and calendar event creation still require explicit approval.
+
 ## PRD to Runner Flow
 
 ```powershell
