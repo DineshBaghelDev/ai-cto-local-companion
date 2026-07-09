@@ -3,6 +3,12 @@
 .env.*
 !.env.example
 .claude/
+client_secret*.json
+credentials*.json
+token*.json
+google-token*.json
+gmail-token*.json
+calendar-token*.json
 
 # Runtime state, logs, generated launchers
 .run/
