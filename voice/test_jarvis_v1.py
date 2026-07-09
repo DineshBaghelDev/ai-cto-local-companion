@@ -23,6 +23,9 @@ os.environ["AI_CTO_ALLOWED_ROOTS"] = str(action_root)
 import coder  # noqa: E402
 import jarvis  # noqa: E402
 import supervisor  # noqa: E402
+import browser_tools  # noqa: E402
+import google_tools  # noqa: E402
+import orchestrator  # noqa: E402
 
 sys.path.insert(0, str(ROOT / "voice"))
 import actions  # noqa: E402
@@ -82,6 +85,15 @@ def test_file_tools_guardrails():
     assert not actions.run_command("git push", str(root))["ok"]
 
 
+def test_v2_optional_tools_fail_closed():
+    assert browser_tools.browser_read_page("https://example.com")["proof"] == "playwright_import_checked"
+    assert google_tools.google_auth_status()["proof"].startswith("token_exists=")
+    assert not google_tools.email_send_draft("draft-1")["ok"]
+    assert not google_tools.calendar_create_event("Meet", "2026-07-10T10:00:00+05:30",
+                                                  "2026-07-10T10:30:00+05:30")["ok"]
+    assert "proof" in orchestrator.langgraph_status()
+
+
 if __name__ == "__main__":
     test_task_intent()
     test_activity_log()
@@ -90,6 +102,7 @@ if __name__ == "__main__":
     test_supervisor_ledger_and_proof()
     test_supervisor_rejects_success_without_proof()
     test_file_tools_guardrails()
+    test_v2_optional_tools_fail_closed()
     shutil.rmtree(action_root, ignore_errors=True)
     tmp.cleanup()
     print("jarvis v1 self-check: ok")

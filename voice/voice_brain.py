@@ -51,6 +51,9 @@ import escalation  # noqa: E402  (blocker lifecycle, scripts/escalation.py)
 import coder  # noqa: E402  (coding run glue)
 import jarvis  # noqa: E402  (memory write + web helpers)
 import supervisor  # noqa: E402  (run ledger + proof contract)
+import browser_tools  # noqa: E402  (optional Playwright/Chrome tools)
+import google_tools  # noqa: E402  (optional Gmail/Calendar tools)
+import orchestrator  # noqa: E402  (optional LangGraph hook)
 
 import actions  # noqa: E402  (voice-driven file edits + project launching)
 from memory_observer import AutoMemory  # noqa: E402
@@ -93,6 +96,11 @@ Voice rules — your words are synthesized aloud:
   call open_file. Do not use open_project for files.
 - If asked to find/read/write/open folders, URLs, run commands, or run tests, use the
   matching local tool and report the proof briefly.
+- Browser automation, Gmail, Calendar, and LangGraph are optional V2 tools. If a tool
+  says setup is missing or approval is required, say that plainly and do not pretend
+  the action happened.
+- Never send email or create calendar events unless the human explicitly approves
+  that exact action in the current conversation.
 - If asked to use Codex to create or change files in a folder, call codex_task.
   Never claim a file was created, opened, or changed unless quick_task or codex_task
   returned ok true with proof.
@@ -255,6 +263,20 @@ TOOL_SPECS: list[tuple[str, str, dict, list[str], object]] = [
         lambda: supervisor.cancel_current_task(),
     ),
     (
+        "langgraph_status",
+        "Check whether LangGraph is available for durable supervisor workflows.",
+        {},
+        [],
+        lambda: orchestrator.langgraph_status(),
+    ),
+    (
+        "supervisor_plan",
+        "Create a tiny LangGraph-backed supervisor plan when LangGraph is available.",
+        {"goal": {"type": "string"}},
+        ["goal"],
+        lambda goal: orchestrator.supervisor_plan(goal),
+    ),
+    (
         "find_file",
         "Find files or folders by name under allowed roots. kind can be any, file, or folder.",
         {"query": {"type": "string"}, "kind": {"type": "string", "enum": ["any", "file", "folder"]}},
@@ -295,6 +317,41 @@ TOOL_SPECS: list[tuple[str, str, dict, list[str], object]] = [
         lambda url: actions.open_url(url),
     ),
     (
+        "browser_open_tab",
+        "Open a URL in the default browser.",
+        {"url": {"type": "string"}},
+        ["url"],
+        lambda url: browser_tools.browser_open_tab(url),
+    ),
+    (
+        "open_controlled_chrome",
+        "Start Chrome with remote debugging on port 9222 for inspected browser sessions.",
+        {"url": {"type": "string"}},
+        [],
+        lambda url="about:blank": browser_tools.open_controlled_chrome(url or "about:blank"),
+    ),
+    (
+        "browser_list_tabs",
+        "List tabs from a Chrome instance started with remote debugging on port 9222.",
+        {},
+        [],
+        lambda: browser_tools.browser_list_tabs(),
+    ),
+    (
+        "browser_read_page",
+        "Read page text using Playwright when installed.",
+        {"url": {"type": "string"}},
+        ["url"],
+        lambda url: browser_tools.browser_read_page(url),
+    ),
+    (
+        "browser_click",
+        "Click a selector on a page using Playwright when installed. Do not use for form submits without approval.",
+        {"url": {"type": "string"}, "selector": {"type": "string"}},
+        ["url", "selector"],
+        lambda url, selector: browser_tools.browser_click(url, selector),
+    ),
+    (
         "read_file",
         "Read a small text file under allowed roots. Refuses binary and oversized files.",
         {"target": {"type": "string"}, "max_bytes": {"type": "integer"}},
@@ -321,6 +378,62 @@ TOOL_SPECS: list[tuple[str, str, dict, list[str], object]] = [
         {"cwd": {"type": "string"}, "command": {"type": "string"}},
         [],
         lambda cwd="", command="": actions.run_tests(cwd or "", command or ""),
+    ),
+    (
+        "google_auth_status",
+        "Check whether Gmail/Calendar OAuth token and client secret are configured.",
+        {},
+        [],
+        lambda: google_tools.google_auth_status(),
+    ),
+    (
+        "email_search",
+        "Search Gmail. Requires local Google OAuth setup.",
+        {"query": {"type": "string"}, "limit": {"type": "integer"}},
+        ["query"],
+        lambda query, limit=10: google_tools.email_search(query, limit or 10),
+    ),
+    (
+        "email_read_thread",
+        "Read Gmail thread snippets. Requires local Google OAuth setup.",
+        {"thread_id": {"type": "string"}},
+        ["thread_id"],
+        lambda thread_id: google_tools.email_read_thread(thread_id),
+    ),
+    (
+        "email_draft_reply",
+        "Create a Gmail draft. Does not send.",
+        {"to": {"type": "string"}, "subject": {"type": "string"}, "body": {"type": "string"}},
+        ["to", "subject", "body"],
+        lambda to, subject, body: google_tools.email_draft_reply(to, subject, body),
+    ),
+    (
+        "email_send_draft",
+        "Send a Gmail draft only after explicit approval.",
+        {"draft_id": {"type": "string"}, "approved": {"type": "boolean"}},
+        ["draft_id", "approved"],
+        lambda draft_id, approved=False: google_tools.email_send_draft(draft_id, bool(approved)),
+    ),
+    (
+        "calendar_read",
+        "Read upcoming Google Calendar events. Requires local Google OAuth setup.",
+        {"days": {"type": "integer"}},
+        [],
+        lambda days=7: google_tools.calendar_read(days or 7),
+    ),
+    (
+        "calendar_create_event",
+        "Create a Google Calendar event only after explicit approval.",
+        {
+            "summary": {"type": "string"},
+            "start_iso": {"type": "string"},
+            "end_iso": {"type": "string"},
+            "approved": {"type": "boolean"},
+        },
+        ["summary", "start_iso", "end_iso", "approved"],
+        lambda summary, start_iso, end_iso, approved=False: google_tools.calendar_create_event(
+            summary, start_iso, end_iso, bool(approved)
+        ),
     ),
     (
         "codex_task",
