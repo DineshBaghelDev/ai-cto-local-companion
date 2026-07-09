@@ -86,7 +86,8 @@ def test_file_tools_guardrails():
 
 
 def test_v2_optional_tools_fail_closed():
-    assert browser_tools.browser_read_page("https://example.com")["proof"] == "playwright_import_checked"
+    page = browser_tools.browser_read_page("https://example.com")
+    assert page["proof"] == "playwright_import_checked" or page["proof"].startswith("loaded_url=")
     assert google_tools.google_auth_status()["proof"].startswith("token_exists=")
     assert not google_tools.email_send_draft("draft-1")["ok"]
     assert not google_tools.calendar_create_event("Meet", "2026-07-10T10:00:00+05:30",

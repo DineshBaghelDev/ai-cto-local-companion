@@ -148,34 +148,57 @@ Never store tokens in chat, Markdown, logs, or repo files.
 ## Optional V2 Tools
 
 Jarvis exposes optional LangGraph, browser, Gmail, and Calendar tools. They are
-off by default and fail closed with a setup message when dependencies or OAuth
-files are missing.
+safe-by-default: they return proof when available and fail closed with a setup
+message when dependencies or OAuth files are missing.
 
-Browser automation:
-
-```powershell
-pip install playwright
-python -m playwright install chromium
-```
-
-Gmail and Calendar:
+Install the optional V2 package set inside the voice runtime:
 
 ```powershell
-pip install google-api-python-client google-auth-oauthlib
+voice\.venv\Scripts\python.exe -m pip install -r voice\requirements-v2.txt
+voice\.venv\Scripts\python.exe -m playwright install chromium
 ```
+
+This enables:
+
+* LangGraph supervisor planning (`langgraph_status`, `supervisor_plan`).
+* Headless browser reads/clicks/downloads through Playwright.
+* Controlled Chrome helpers (`open_controlled_chrome`, `browser_list_tabs`) when
+  Chrome is available.
+* Gmail search/read/draft/send and Calendar read/create through local Google OAuth.
 
 Create a Google OAuth desktop client, save its client-secret JSON outside git
 at `.run/google-client-secret.json`, then use `google_auth_status` or any
 Gmail/Calendar tool to complete local OAuth. Tokens are written under
 `AI_CTO_STATE` or `AI_CTO_GOOGLE_TOKEN` and are ignored by git.
 
-LangGraph:
+Email sending and calendar event creation still require explicit approval.
+
+## Verification
+
+Lightweight local checks:
 
 ```powershell
-pip install langgraph
+voice\.venv\Scripts\python.exe voice\test_jarvis_v1.py
+voice\.venv\Scripts\python.exe -m py_compile scripts\browser_tools.py scripts\google_tools.py scripts\orchestrator.py scripts\supervisor.py voice\actions.py voice\bot.py voice\voice_brain.py voice\test_jarvis_v1.py
 ```
 
-Email sending and calendar event creation still require explicit approval.
+V2 smoke checks:
+
+```powershell
+@'
+import sys
+from pathlib import Path
+root = Path(r"E:\Projects\AI CTO")
+sys.path.insert(0, str(root / "scripts"))
+import browser_tools, google_tools, orchestrator
+print(browser_tools.browser_read_page("https://example.com")["ok"])
+print(google_tools.google_auth_status()["proof"])
+print(orchestrator.supervisor_plan("test v2")["ok"])
+'@ | voice\.venv\Scripts\python.exe -
+```
+
+Expected before Google OAuth: browser and LangGraph are `True`; Google reports
+`token_exists=False client_secret_exists=False` until credentials are configured.
 
 ## PRD to Runner Flow
 

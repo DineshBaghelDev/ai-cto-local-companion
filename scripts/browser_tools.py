@@ -5,6 +5,8 @@ Uses Playwright when installed; otherwise falls back to safe open/list behavior.
 from __future__ import annotations
 
 import json
+import os
+import pathlib
 import subprocess
 import urllib.request
 import webbrowser
@@ -104,8 +106,10 @@ def browser_download(url: str, target: str = "") -> dict:
 
 def open_controlled_chrome(url: str = "about:blank") -> dict:
     chrome = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+    profile = pathlib.Path(os.environ.get("TEMP", ".")) / "jarvis-chrome"
+    profile.mkdir(parents=True, exist_ok=True)
     try:
-        subprocess.Popen([chrome, "--remote-debugging-port=9222", "--user-data-dir=%TEMP%\\jarvis-chrome", url])
+        subprocess.Popen([chrome, "--remote-debugging-port=9222", f"--user-data-dir={profile}", url])
     except Exception as e:
         return {"ok": False, "action": "open_controlled_chrome", "target": chrome,
                 "summary": str(e), "proof": "process_start_failed", "error": str(e)}

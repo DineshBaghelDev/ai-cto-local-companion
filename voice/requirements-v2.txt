@@ -1,0 +1,9 @@
+# Optional V2 integrations. Install inside voice/.venv when you want these tools.
+#
+#   voice\.venv\Scripts\python.exe -m pip install -r voice\requirements-v2.txt
+#   voice\.venv\Scripts\python.exe -m playwright install chromium
+
+google-api-python-client
+google-auth-oauthlib
+langgraph
+playwright
