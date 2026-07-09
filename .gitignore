@@ -1,0 +1,59 @@
+# Secrets and local config
+.env
+.env.*
+!.env.example
+.claude/
+
+# Runtime state, logs, generated launchers
+.run/
+logs/
+*.log
+*.err.log
+*.db
+*.sqlite
+*.sqlite3
+
+# Personal memory vault and agent output
+vault/
+
+# Local sandboxes, nested repos, generated worktrees
+sandbox/
+**/.git/
+**/.ao-sim-worktrees/
+**/AO_SIM_*.md
+**/AO_RESUME_*.md
+**/AO_FEEDBACK_*.md
+
+# Python build/cache/envs
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+env/
+voice/.venv/
+
+# Large/local model and media artifacts
+voice/models/
+voice/test_answer.wav
+*.onnx
+*.bin
+*.gguf
+*.wav
+*.mp3
+*.mp4
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
